@@ -1,0 +1,29 @@
+const $=id=>document.getElementById(id);
+const money=value=>value==null?'—':new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',notation:'compact',maximumFractionDigits:1}).format(Number(value));
+const number=value=>value==null?'—':new Intl.NumberFormat('en-US',{notation:'compact',maximumFractionDigits:1}).format(Number(value));
+const percent=value=>value==null?'—':new Intl.NumberFormat('en-US',{style:'percent',maximumFractionDigits:1,signDisplay:'exceptZero'}).format(Number(value));
+const escapeHtml=value=>{const node=document.createElement('div');node.textContent=String(value??'');return node.innerHTML};
+
+async function jsonFetch(url,options){const response=await fetch(url,options);const data=await response.json();if(!response.ok||data.status==='error')throw new Error(data.message||'Request failed');return data}
+
+function moverHtml(row){const value=Number(row.contribution);return `<div class="mover"><strong>${escapeHtml(row.display_product_name||row.product_key)}</strong><span class="${value>=0?'up':'down'}">${money(value)}</span><small>${escapeHtml(row.product_key)}</small></div>`}
+
+async function loadDashboard(){
+  $('refresh').disabled=true;
+  try{const query=new URLSearchParams({year:$('year').value});if($('quarter').value)query.set('quarter',$('quarter').value);if($('state').value)query.set('state',$('state').value);
+    const data=await jsonFetch(`/api/dashboard?${query}`),k=data.kpis||{},y=data.yoy||{};
+    $('totalReimbursement').textContent=money(k.total_reimbursement);$('prescriptions').textContent=number(k.prescriptions);$('units').textContent=number(k.units_reimbursed);$('rate').textContent=money(k.reimbursement_per_prescription);$('yoy').textContent=percent(y.reimbursement_change_percent);$('yoyAmount').textContent=`${money(y.reimbursement_change)} vs prior year`;
+    $('positiveMovers').innerHTML=data.positive_movers.length?data.positive_movers.map(moverHtml).join(''):'<p class="empty">No positive YoY contributors in this scope.</p>';
+    $('negativeMovers').innerHTML=data.negative_movers.length?data.negative_movers.map(moverHtml).join(''):'<p class="empty">No negative YoY contributors in this scope.</p>';
+  }catch(error){$('positiveMovers').innerHTML=`<p class="empty">${escapeHtml(error.message)}</p>`}finally{$('refresh').disabled=false}}
+
+async function ask(event){event.preventDefault();const input=$('question'),message=input.value.trim();if(!message)return;const conversation=$('conversation');conversation.insertAdjacentHTML('beforeend',`<div class="user-message"><div>${escapeHtml(message)}</div></div><div id="thinking" class="agent-message loading"><div class="avatar">AI</div><div>Investigating governed data and evidence…</div></div>`);conversation.scrollTop=conversation.scrollHeight;input.value='';
+  try{const data=await jsonFetch('/api/agent',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message})});$('thinking').remove();conversation.insertAdjacentHTML('beforeend',`<div class="agent-message"><div class="avatar">AI</div><div><strong>Agent conclusion</strong><p>${escapeHtml(data.answer)}</p></div></div>`);await loadWorkspace()}catch(error){$('thinking').remove();conversation.insertAdjacentHTML('beforeend',`<div class="agent-message"><div class="avatar">!</div><div>${escapeHtml(error.message)}</div></div>`)}conversation.scrollTop=conversation.scrollHeight}
+
+function investigationHtml(row){return `<div class="record"><div class="record-head"><div><h3>${escapeHtml(row.title)}</h3><p>${escapeHtml(row.summary)}</p></div><span class="tag">${escapeHtml(row.status)}</span></div></div>`}
+function actionHtml(row){return `<div class="record"><div class="record-head"><div><h3>${escapeHtml(row.action_text)}</h3><p>Due ${escapeHtml(row.due_date||'not set')}</p></div><span class="tag priority-${escapeHtml(row.priority)}">${escapeHtml(row.priority)}</span></div>${row.status==='open'?`<div class="action-controls"><button data-complete="${escapeHtml(row.action_id)}">Mark completed</button></div>`:`<span class="tag">${escapeHtml(row.status)}</span>`}</div>`}
+async function loadWorkspace(){try{const data=await jsonFetch('/api/workspace');$('investigations').innerHTML=data.investigations.length?data.investigations.map(investigationHtml).join(''):'<p class="empty">No saved investigations yet.</p>';$('actions').innerHTML=data.actions.length?data.actions.map(actionHtml).join(''):'<p class="empty">No follow-up actions yet.</p>'}catch(error){$('investigations').innerHTML=$('actions').innerHTML=`<p class="empty">${escapeHtml(error.message)}</p>`}}
+
+document.addEventListener('click',async event=>{const prompt=event.target.dataset.prompt;if(prompt)$('question').value=prompt;const id=event.target.dataset.complete;if(id){event.target.disabled=true;try{await jsonFetch(`/api/actions/${id}/complete`,{method:'POST'});await loadWorkspace()}catch(error){event.target.textContent=error.message}}});
+$('agentForm').addEventListener('submit',ask);$('refresh').addEventListener('click',loadDashboard);$('reloadWorkspace').addEventListener('click',loadWorkspace);loadDashboard();loadWorkspace();
+

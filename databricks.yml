@@ -1,0 +1,129 @@
+bundle:
+  name: pharma-market-financial-intelligence
+
+variables:
+  catalog:
+    description: Existing Unity Catalog catalog
+    default: main
+  schema:
+    description: Capstone analytical schema
+    default: pharma_market_intelligence
+  volume:
+    description: Existing or capstone-managed volume name
+    default: pharma_pipeline
+  medicaid_states:
+    description: Comma-separated bounded demo states
+    default: CA,TX,NY,FL,IL
+  medicaid_years:
+    description: Comparison years
+    default: 2024,2025
+  cms_mode:
+    description: api or bulk_csv
+    default: api
+  lakebase_host:
+    description: Existing Lakebase PostgreSQL host for Job tasks
+  lakebase_endpoint_name:
+    description: Existing Lakebase Autoscaling endpoint resource name
+  lakebase_database:
+    description: Existing Lakebase database
+    default: databricks_postgres
+  lakebase_user:
+    description: Databricks principal/database role used by Job OAuth
+
+resources:
+  jobs:
+    pharma_intelligence_pipeline:
+      name: pharma-market-financial-intelligence-pipeline
+      max_concurrent_runs: 1
+      parameters:
+        - name: catalog
+          default: ${var.catalog}
+      tasks:
+        - task_key: ingest_medicaid_subset
+          spark_python_task:
+            python_file: ./pipeline/01_ingest_medicaid.py
+            parameters: &pipeline_config
+              - --catalog
+              - ${var.catalog}
+              - --schema
+              - ${var.schema}
+              - --volume
+              - ${var.volume}
+              - --medicaid-states
+              - ${var.medicaid_states}
+              - --medicaid-years
+              - ${var.medicaid_years}
+              - --cms-mode
+              - ${var.cms_mode}
+          environment_key: default
+        - task_key: transform_medicaid_silver
+          depends_on:
+            - task_key: ingest_medicaid_subset
+          spark_python_task:
+            python_file: ./pipeline/02_transform_silver.py
+            parameters: *pipeline_config
+          environment_key: default
+        - task_key: build_gold_analytics
+          depends_on:
+            - task_key: transform_medicaid_silver
+          spark_python_task:
+            python_file: ./pipeline/03_build_gold.py
+            parameters: *pipeline_config
+          environment_key: default
+        - task_key: enrich_top_products_openfda
+          depends_on:
+            - task_key: build_gold_analytics
+          spark_python_task:
+            python_file: ./pipeline/04_enrich_openfda.py
+            parameters: &lakebase_config
+              - --catalog
+              - ${var.catalog}
+              - --schema
+              - ${var.schema}
+              - --volume
+              - ${var.volume}
+              - --medicaid-states
+              - ${var.medicaid_states}
+              - --medicaid-years
+              - ${var.medicaid_years}
+              - --cms-mode
+              - ${var.cms_mode}
+              - --pg-host
+              - ${var.lakebase_host}
+              - --pg-database
+              - ${var.lakebase_database}
+              - --pg-port
+              - "5432"
+              - --pg-sslmode
+              - require
+              - --pg-user
+              - ${var.lakebase_user}
+              - --endpoint-name
+              - ${var.lakebase_endpoint_name}
+              - --app-schema
+              - pharma_intelligence
+          environment_key: default
+        - task_key: embed_drug_documents
+          depends_on:
+            - task_key: enrich_top_products_openfda
+          spark_python_task:
+            python_file: ./pipeline/05_ingest_drug_embeddings.py
+            parameters: *lakebase_config
+          environment_key: default
+      environments:
+        - environment_key: default
+          spec:
+            client: "1"
+            dependencies:
+              - requests>=2.32,<3
+              - databricks-sdk>=0.57,<1
+              - psycopg2-binary>=2.9,<3
+              - sentence-transformers>=3.0,<4
+targets:
+  dev:
+    mode: development
+    default: true
+  prod:
+    mode: production
+    workspace:
+      root_path: /Shared/.bundle/${bundle.name}/${bundle.target}

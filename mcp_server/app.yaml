@@ -1,0 +1,22 @@
+command:
+  - python
+  - finance_mcp_server.py
+env:
+  - name: ENDPOINT_NAME
+    valueFrom: postgres
+  - name: WAREHOUSE_ID
+    valueFrom: sql-warehouse
+  - name: APP_SCHEMA
+    value: pharma_intelligence
+  - name: CATALOG
+    value: main
+  - name: SCHEMA
+    value: pharma_market_intelligence
+  - name: EMBEDDING_MODEL_NAME
+    value: sentence-transformers/all-MiniLM-L6-v2
+  - name: CHUNK_SIZE
+    value: "800"
+  - name: CHUNK_OVERLAP
+    value: "100"
+  - name: LOG_LEVEL
+    value: INFO

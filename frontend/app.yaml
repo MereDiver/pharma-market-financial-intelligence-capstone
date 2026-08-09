@@ -1,0 +1,25 @@
+command:
+  - gunicorn
+  - app:app
+  - --bind
+  - 0.0.0.0:$DATABRICKS_APP_PORT
+  - --workers
+  - "2"
+  - --threads
+  - "4"
+env:
+  - name: AGENT_ENDPOINT
+    valueFrom: finance-agent
+  - name: ENDPOINT_NAME
+    valueFrom: postgres
+  - name: WAREHOUSE_ID
+    valueFrom: sql-warehouse
+  - name: APP_SCHEMA
+    value: pharma_intelligence
+  - name: CATALOG
+    value: main
+  - name: SCHEMA
+    value: pharma_market_intelligence
+  - name: LOG_LEVEL
+    value: INFO
+

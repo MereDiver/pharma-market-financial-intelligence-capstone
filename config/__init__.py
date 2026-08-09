@@ -1,0 +1,2 @@
+"""Central configuration package."""
+
