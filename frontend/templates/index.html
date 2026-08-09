@@ -77,6 +77,13 @@
         </article>
         <article class="card">
           <div class="section-heading"><div><p class="eyebrow">ANALYST CONTEXT</p><h2>Investigation notes</h2></div></div>
+          <form id="noteForm" class="note-form">
+            <label for="noteInvestigation">Link to investigation</label>
+            <select id="noteInvestigation" required><option value="">Choose an investigation</option></select>
+            <label for="noteText">Controller note</label>
+            <textarea id="noteText" rows="2" maxlength="10000" placeholder="Add review context or a decision note…" required></textarea>
+            <div class="note-submit-row"><small id="noteStatus"></small><button class="primary" type="submit">Add note</button></div>
+          </form>
           <div id="notes" class="record-list"><p class="empty">Loading analyst notes…</p></div>
         </article>
       </section>

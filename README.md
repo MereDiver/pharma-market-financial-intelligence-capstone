@@ -128,7 +128,7 @@ Every tool has selection guidance and limitations in its FastMCP docstring. Appl
 
 ## Frontend
 
-The single frontend App provides management-facing KPI cards, positive/negative YoY movers, a prominent “Ask Pharma Finance” Agent panel, saved investigations, analyst notes, follow-up actions, and a basic action-completion control. Human approval cards expose the exact arguments of every proposed operational write before execution. The App attaches the Agent endpoint, SQL Warehouse, and existing Lakebase database through managed App resources and uses `WorkspaceClient()` authentication. It does not contain fixed answers or analytical writes.
+The single frontend App provides management-facing KPI cards, positive/negative YoY movers, a prominent “Ask Pharma Finance” Agent panel, saved investigations, a controller-facing note form, follow-up actions, and a basic action-completion control. Human approval cards expose the exact arguments of every Agent-proposed operational write before execution. The App attaches the Agent endpoint, SQL Warehouse, and existing Lakebase database through managed App resources and uses `WorkspaceClient()` authentication. It does not contain fixed answers or analytical writes.
 
 ## Free Edition resource design
 
@@ -175,7 +175,7 @@ Use `--var="cms_mode=bulk_csv"` only for the fallback. Run once initially; there
 
 ### 3. Database permissions
 
-Reuse the existing Lakebase project. Create only the `pharma_intelligence` schema/tables via the pipeline's idempotent initialization. Grant the MCP App identity access to that schema for document reads and operational DML; grant the frontend identity `SELECT` on investigations, analyst notes, and follow-up actions plus `UPDATE` only on follow-up action status if using the completion button. Do not configure a static database password.
+Reuse the existing Lakebase project. Create only the `pharma_intelligence` schema/tables via the pipeline's idempotent initialization. Grant the MCP App identity access to that schema for document reads and operational DML; grant the frontend identity `SELECT` on investigations, analyst notes, and follow-up actions, `INSERT` on analyst notes, plus `UPDATE` only on follow-up action status if using the completion button. Do not configure a static database password.
 
 ### 4. SQL Warehouse and Unity Catalog permissions
 

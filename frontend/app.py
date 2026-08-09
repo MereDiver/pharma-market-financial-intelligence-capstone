@@ -62,8 +62,24 @@ def agent_approval():
 
 @app.get("/api/workspace")
 def workspace():
-    return jsonify({"status": "success", "investigations": safe(lakebase.investigations()),
-                    "actions": safe(lakebase.actions()), "notes": safe(lakebase.notes())})
+    collections = {}
+    errors = {}
+    for name, loader in (("investigations", lakebase.investigations),
+                         ("actions", lakebase.actions), ("notes", lakebase.notes)):
+        try:
+            collections[name] = safe(loader())
+        except Exception:
+            logger.exception("Workspace collection unavailable: %s", name)
+            collections[name] = []
+            errors[name] = f"{name.replace('_', ' ').title()} access is not configured."
+    return jsonify({"status": "success", **collections, "errors": errors})
+
+
+@app.post("/api/investigations/<investigation_id>/notes")
+def add_note(investigation_id: str):
+    payload = request.get_json(silent=True) or {}
+    note_id = lakebase.add_note(investigation_id, payload.get("note_text", ""))
+    return jsonify({"status": "success", "note_id": note_id}), 201
 
 
 @app.post("/api/actions/<action_id>/complete")

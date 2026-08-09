@@ -6,6 +6,7 @@ import os
 import re
 from contextlib import contextmanager
 from typing import Any, Iterator
+from uuid import UUID, uuid4
 
 import psycopg2
 from databricks.sdk import WorkspaceClient
@@ -68,8 +69,28 @@ def notes() -> list[dict[str, Any]]:
     return query(statement)
 
 
+def add_note(investigation_id: str, note_text: str, author: str = "Frontend controller") -> str:
+    normalized_id = str(UUID(str(investigation_id)))
+    normalized_note = " ".join(str(note_text or "").split())
+    if not normalized_note or len(normalized_note) > 10000:
+        raise ValueError("Note must be between 1 and 10000 characters.")
+    note_id = str(uuid4())
+    statement = sql.SQL(
+        "INSERT INTO {}.analyst_notes (note_id,investigation_id,note_text,author) "
+        "VALUES (%s,%s,%s,%s)"
+    ).format(sql.Identifier(schema_name()))
+    with connection() as db:
+        try:
+            with db.cursor() as cursor:
+                cursor.execute(statement, (note_id, normalized_id, normalized_note, author))
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+    return note_id
+
+
 def complete_action(action_id: str) -> bool:
-    from uuid import UUID
     normalized = str(UUID(action_id))
     with connection() as db:
         try:

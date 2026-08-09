@@ -145,6 +145,15 @@ textarea { width: 100%; resize: vertical; border: 1px solid var(--line); border-
 .priority-high { background: #fdecef; color: #b8414c; }
 .priority-medium { background: #fff3da; color: #9b6d15; }
 .note-mark { flex: 0 0 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: #eff9e5; color: var(--deep-green); font-size: 9px; font-weight: 800; }
+.note-form { margin: -2px 0 14px; padding: 12px; border: 1px solid #dce9ee; border-radius: 12px; background: var(--surface); }
+.note-form label { display: block; margin: 0 0 5px; color: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: .7px; text-transform: uppercase; }
+.note-form select { margin-bottom: 9px; }
+.note-form textarea { min-height: 66px; margin: 0 0 8px; background: #fff; }
+.note-submit-row { min-height: 34px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.note-submit-row small { color: var(--deep-green); font-size: 10px; }
+.note-submit-row .primary { display: block; padding: 8px 12px; }
+.note-submit-row button:disabled { opacity: .55; cursor: not-allowed; }
+.warning { color: #a36b12; }
 .action-controls { margin-top: 8px; }
 .action-controls button { border: 0; background: #eff9e5; color: var(--deep-green); font-size: 9px; font-weight: 700; border-radius: 7px; padding: 6px 8px; cursor: pointer; }
 footer { text-align: center; color: #7d929e; font-size: 10px; padding: 24px 0 0; }
