@@ -63,7 +63,7 @@ def agent_approval():
 @app.get("/api/workspace")
 def workspace():
     return jsonify({"status": "success", "investigations": safe(lakebase.investigations()),
-                    "actions": safe(lakebase.actions())})
+                    "actions": safe(lakebase.actions()), "notes": safe(lakebase.notes())})
 
 
 @app.post("/api/actions/<action_id>/complete")

@@ -57,6 +57,17 @@ def actions() -> list[dict[str, Any]]:
     return query(sql.SQL("SELECT action_id,investigation_id,action_text,priority,status,due_date,created_at FROM {}.follow_up_actions ORDER BY created_at DESC LIMIT 50").format(sql.Identifier(schema_name())))
 
 
+def notes() -> list[dict[str, Any]]:
+    schema = sql.Identifier(schema_name())
+    statement = sql.SQL(
+        "SELECT n.note_id,n.investigation_id,n.note_text,n.author,n.created_at,"
+        "i.title AS investigation_title FROM {}.analyst_notes n "
+        "JOIN {}.investigations i ON i.investigation_id=n.investigation_id "
+        "ORDER BY n.created_at DESC LIMIT 50"
+    ).format(schema, schema)
+    return query(statement)
+
+
 def complete_action(action_id: str) -> bool:
     from uuid import UUID
     normalized = str(UUID(action_id))
@@ -69,4 +80,3 @@ def complete_action(action_id: str) -> bool:
             return changed
         except Exception:
             db.rollback(); raise
-
