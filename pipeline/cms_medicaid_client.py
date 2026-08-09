@@ -36,8 +36,8 @@ class CMSClientError(RuntimeError):
 class CMSMedicaidClient:
     def __init__(self, *, session: requests.Session | None = None, page_size: int = 5000,
                  timeout: tuple[float, float] = (10, 90), max_retries: int = 4) -> None:
-        if not 100 <= page_size <= 10000:
-            raise ValueError("page_size must be between 100 and 10000")
+        if not 100 <= page_size <= 5000:
+            raise ValueError("page_size must be between 100 and the CMS API maximum of 5000")
         self.session = session or requests.Session()
         self.page_size = page_size
         self.timeout = timeout
@@ -106,4 +106,3 @@ class CMSMedicaidClient:
         finally:
             wrapper.close()
             response.close()
-

@@ -38,6 +38,11 @@ def test_cms_malformed_payload():
     with pytest.raises(CMSClientError): list(client.iter_api_pages("dataset","CA"))
 
 
+def test_cms_rejects_page_sizes_above_api_maximum():
+    with pytest.raises(ValueError, match="maximum of 5000"):
+        CMSMedicaidClient(page_size=5001)
+
+
 def ndc_result():
     return {"brand_name":"Example","generic_name":"example ingredient","packaging":[{"package_ndc":"1234-5678-90"}],"openfda":{"manufacturer_name":["Example Labs"]}}
 
@@ -60,4 +65,3 @@ def test_openfda_malformed_timeout_rate_limit_and_5xx(monkeypatch):
     with pytest.raises(OpenFDAError): OpenFDAClient(session=timeout_session,max_retries=0)._request("url","search")
     for status in (429,500):
         with pytest.raises(OpenFDAError): OpenFDAClient(session=Session([Response(status)]),max_retries=0)._request("url","search")
-

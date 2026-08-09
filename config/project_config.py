@@ -73,13 +73,13 @@ def load_config() -> ProjectConfig:
     unsupported = sorted(set(years) - CMS_DATASETS.keys())
     if unsupported:
         raise ValueError(f"No CMS dataset configured for years: {unsupported}")
-    page_size = int(os.getenv("CMS_PAGE_SIZE", "10000"))
+    page_size = int(os.getenv("CMS_PAGE_SIZE", "5000"))
     write_batch_size = int(os.getenv("CMS_WRITE_BATCH_SIZE", "50000"))
     maximum = int(os.getenv("MAX_OPENFDA_PRODUCTS", "20"))
     chunk_size = int(os.getenv("CHUNK_SIZE", "800"))
     overlap = int(os.getenv("CHUNK_OVERLAP", "100"))
-    if not 100 <= page_size <= 10000:
-        raise ValueError("CMS_PAGE_SIZE must be between 100 and 10000.")
+    if not 100 <= page_size <= 5000:
+        raise ValueError("CMS_PAGE_SIZE must be between 100 and the CMS API maximum of 5000.")
     if not page_size <= write_batch_size <= 100000:
         raise ValueError("CMS_WRITE_BATCH_SIZE must be between CMS_PAGE_SIZE and 100000.")
     if not 1 <= maximum <= 100:
