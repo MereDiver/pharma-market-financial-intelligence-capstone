@@ -1,6 +1,5 @@
 fastmcp>=2.10,<3
-databricks-sdk>=0.57,<1
+databricks-sdk>=0.81,<1
 psycopg2-binary>=2.9,<3
 sentence-transformers>=3.0,<4
 requests>=2.32,<3
-

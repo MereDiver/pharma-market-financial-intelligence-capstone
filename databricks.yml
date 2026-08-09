@@ -20,19 +20,6 @@ variables:
   cms_mode:
     description: api or bulk_csv
     default: api
-  lakebase_host:
-    description: Existing Lakebase PostgreSQL host for Job tasks
-    default: ""
-  lakebase_endpoint_name:
-    description: Existing Lakebase Autoscaling endpoint resource name
-    default: ""
-  lakebase_database:
-    description: Existing Lakebase database
-    default: databricks_postgres
-  lakebase_user:
-    description: Databricks principal/database role used by Job OAuth
-    default: ""
-
 resources:
   jobs:
     pharma_intelligence_pipeline:
@@ -41,6 +28,10 @@ resources:
       parameters:
         - name: catalog
           default: ${var.catalog}
+        - name: lakebase_endpoint_name
+          default: ""
+        - name: lakebase_database
+          default: databricks_postgres
       tasks:
         - task_key: ingest_medicaid_subset
           spark_python_task:
@@ -91,18 +82,14 @@ resources:
               - ${var.medicaid_years}
               - --cms-mode
               - ${var.cms_mode}
-              - --pg-host
-              - ${var.lakebase_host}
               - --pg-database
-              - ${var.lakebase_database}
+              - '{{job.parameters.lakebase_database}}'
               - --pg-port
               - "5432"
               - --pg-sslmode
               - require
-              - --pg-user
-              - ${var.lakebase_user}
               - --endpoint-name
-              - ${var.lakebase_endpoint_name}
+              - '{{job.parameters.lakebase_endpoint_name}}'
               - --app-schema
               - pharma_intelligence
           environment_key: default
@@ -119,7 +106,7 @@ resources:
             environment_version: "2"
             dependencies:
               - requests>=2.32,<3
-              - databricks-sdk>=0.57,<1
+              - databricks-sdk>=0.81,<1
               - psycopg2-binary>=2.9,<3
               - sentence-transformers>=3.0,<4
 targets:

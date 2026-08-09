@@ -1,5 +1,4 @@
 Flask>=3.0,<4
 gunicorn>=22,<24
-databricks-sdk>=0.57,<1
+databricks-sdk>=0.81,<1
 psycopg2-binary>=2.9,<3
-

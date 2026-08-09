@@ -27,18 +27,41 @@ def get_schema_name() -> str:
     return value
 
 
+def _resolve_endpoint_host(client: WorkspaceClient, endpoint_name: str) -> str:
+    endpoint = client.postgres.get_endpoint(name=endpoint_name)
+    status = getattr(endpoint, "status", None)
+    hosts = getattr(status, "hosts", None)
+    host = getattr(hosts, "host", None) or getattr(hosts, "read_write_pooled_host", None)
+    if not host:
+        raise LakebaseConfigurationError("The Lakebase endpoint did not return a PostgreSQL host.")
+    return host
+
+
+def _resolve_current_user(client: WorkspaceClient) -> str:
+    identity = client.current_user.me()
+    user = getattr(identity, "user_name", None) or getattr(identity, "id", None)
+    if not user:
+        raise LakebaseConfigurationError("Databricks did not return the current Job identity.")
+    return user
+
+
 @contextmanager
 def get_connection() -> Iterator[Any]:
+    endpoint = (os.getenv("ENDPOINT_NAME") or "").strip()
+    if not endpoint:
+        raise LakebaseConfigurationError("Missing Lakebase setting: ENDPOINT_NAME")
+
     client = WorkspaceClient()
+    host = (os.getenv("PGHOST") or "").strip() or _resolve_endpoint_host(client, endpoint)
+    user = (os.getenv("PGUSER") or "").strip() or _resolve_current_user(client)
     settings = {
-        "host": os.getenv("PGHOST"), "dbname": os.getenv("PGDATABASE"),
+        "host": host, "dbname": os.getenv("PGDATABASE"),
         "port": os.getenv("PGPORT"), "sslmode": os.getenv("PGSSLMODE"),
-        "user": os.getenv("PGUSER"), "endpoint": os.getenv("ENDPOINT_NAME"),
+        "user": user,
     }
     missing = [key.upper() for key, value in settings.items() if not value]
     if missing:
         raise LakebaseConfigurationError("Missing Lakebase settings: " + ", ".join(sorted(missing)))
-    endpoint = settings.pop("endpoint")
     try:
         settings["port"] = int(settings["port"])
     except (TypeError, ValueError) as exc:

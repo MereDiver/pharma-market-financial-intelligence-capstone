@@ -151,17 +151,16 @@ It creates no new Lakebase project, AI Search endpoint, GPU endpoint, monitoring
 
 ### 2. Configure and deploy the manual Job
 
-The bundle requires existing Lakebase connection metadata for the final two tasks. These are resource coordinates/user names, not static database credentials; the code generates short-lived OAuth credentials.
+The final two tasks accept the existing Lakebase endpoint resource name as a runtime Job parameter. The code obtains the endpoint host and current Job identity through the Databricks SDK, then generates a short-lived OAuth credential. No PostgreSQL host, user, password, or OAuth token is committed.
 
 ```bash
-databricks bundle validate \
-  --var="lakebase_host=<existing-host>,lakebase_endpoint_name=<existing-endpoint>,lakebase_user=<principal>"
-
-databricks bundle deploy \
-  --var="catalog=<catalog>,schema=pharma_market_intelligence,lakebase_host=<existing-host>,lakebase_endpoint_name=<existing-endpoint>,lakebase_user=<principal>"
-
-databricks bundle run pharma_intelligence_pipeline
+databricks bundle validate -t dev
+databricks bundle deploy -t dev
+databricks bundle run -t dev pharma_intelligence_pipeline -- \
+  --lakebase_endpoint_name="projects/<project>/branches/<branch>/endpoints/<endpoint>"
 ```
+
+Alternatively, open the deployed Job, select **Run now with different settings**, and set `lakebase_endpoint_name`; `lakebase_database` defaults to `databricks_postgres`. Use the endpoint's full resource name from Lakebase **Computes > Get ID > Copy resource name**. The Job's **Run as** identity must have an OAuth Postgres role and permission to inspect that endpoint.
 
 Use `--var="cms_mode=bulk_csv"` only for the fallback. Run once initially; there is no schedule. Inspect counts, suppression nulls, representative Gold metrics, openFDA match statuses, document counts, embedding counts, and decomposition reconciliation before App deployment.
 
@@ -204,7 +203,7 @@ Update frontend catalog/schema environment values if needed, deploy, verify `/he
 
 - No workspace URL, warehouse ID, endpoint ID, credential, openFDA key value, database password, client secret, or personal access credential is committed.
 - App resources inject runtime identifiers. `WorkspaceClient()` handles App identity authentication.
-- Lakebase uses `generate_database_credential` and attached `PG*` settings; no credential-bearing database URL exists.
+- Lakebase uses `generate_database_credential`; Jobs derive host/user metadata from the endpoint and run identity, while Apps receive `PG*` settings from attached resources. No credential-bearing database URL exists.
 - `OPENFDA_API_KEY` is optional and absent by default. If used, inject it through secure Databricks runtime configuration/secret handling.
 - Agent operational tables are isolated from analytical facts. Least-privilege grants enforce the boundary in addition to tool design.
 - Logs and user errors do not disclose internal exception details.
