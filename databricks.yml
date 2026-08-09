@@ -28,29 +28,44 @@ resources:
       parameters:
         - name: catalog
           default: ${var.catalog}
+        - name: medicaid_states
+          default: ${var.medicaid_states}
+        - name: medicaid_years
+          default: ${var.medicaid_years}
+        - name: cms_mode
+          default: ${var.cms_mode}
+        - name: max_openfda_products
+          default: "20"
         - name: lakebase_endpoint_name
           default: ""
         - name: lakebase_database
           default: databricks_postgres
       tasks:
         - task_key: ingest_medicaid_subset
+          disable_auto_optimization: true
+          max_retries: 0
+          retry_on_timeout: false
           spark_python_task:
             python_file: ./pipeline/01_ingest_medicaid.py
             parameters: &pipeline_config
               - --catalog
-              - ${var.catalog}
+              - '{{job.parameters.catalog}}'
               - --schema
               - ${var.schema}
               - --volume
               - ${var.volume}
               - --medicaid-states
-              - ${var.medicaid_states}
+              - '{{job.parameters.medicaid_states}}'
               - --medicaid-years
-              - ${var.medicaid_years}
+              - '{{job.parameters.medicaid_years}}'
               - --cms-mode
-              - ${var.cms_mode}
+              - '{{job.parameters.cms_mode}}'
+              - --max-openfda-products
+              - '{{job.parameters.max_openfda_products}}'
           environment_key: default
         - task_key: transform_medicaid_silver
+          max_retries: 0
+          retry_on_timeout: false
           depends_on:
             - task_key: ingest_medicaid_subset
           spark_python_task:
@@ -58,6 +73,8 @@ resources:
             parameters: *pipeline_config
           environment_key: default
         - task_key: build_gold_analytics
+          max_retries: 0
+          retry_on_timeout: false
           depends_on:
             - task_key: transform_medicaid_silver
           spark_python_task:
@@ -65,23 +82,27 @@ resources:
             parameters: *pipeline_config
           environment_key: default
         - task_key: enrich_top_products_openfda
+          max_retries: 0
+          retry_on_timeout: false
           depends_on:
             - task_key: build_gold_analytics
           spark_python_task:
             python_file: ./pipeline/04_enrich_openfda.py
             parameters: &lakebase_config
               - --catalog
-              - ${var.catalog}
+              - '{{job.parameters.catalog}}'
               - --schema
               - ${var.schema}
               - --volume
               - ${var.volume}
               - --medicaid-states
-              - ${var.medicaid_states}
+              - '{{job.parameters.medicaid_states}}'
               - --medicaid-years
-              - ${var.medicaid_years}
+              - '{{job.parameters.medicaid_years}}'
               - --cms-mode
-              - ${var.cms_mode}
+              - '{{job.parameters.cms_mode}}'
+              - --max-openfda-products
+              - '{{job.parameters.max_openfda_products}}'
               - --pg-database
               - '{{job.parameters.lakebase_database}}'
               - --pg-port
@@ -94,6 +115,8 @@ resources:
               - pharma_intelligence
           environment_key: default
         - task_key: embed_drug_documents
+          max_retries: 0
+          retry_on_timeout: false
           depends_on:
             - task_key: enrich_top_products_openfda
           spark_python_task:

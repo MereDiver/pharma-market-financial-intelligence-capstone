@@ -53,6 +53,7 @@ class ProjectConfig:
     years: tuple[int, ...]
     cms_mode: str
     cms_page_size: int
+    cms_write_batch_size: int
     max_openfda_products: int
     app_schema: str
     embedding_model_name: str
@@ -72,12 +73,15 @@ def load_config() -> ProjectConfig:
     unsupported = sorted(set(years) - CMS_DATASETS.keys())
     if unsupported:
         raise ValueError(f"No CMS dataset configured for years: {unsupported}")
-    page_size = int(os.getenv("CMS_PAGE_SIZE", "5000"))
-    maximum = int(os.getenv("MAX_OPENFDA_PRODUCTS", "50"))
+    page_size = int(os.getenv("CMS_PAGE_SIZE", "10000"))
+    write_batch_size = int(os.getenv("CMS_WRITE_BATCH_SIZE", "50000"))
+    maximum = int(os.getenv("MAX_OPENFDA_PRODUCTS", "20"))
     chunk_size = int(os.getenv("CHUNK_SIZE", "800"))
     overlap = int(os.getenv("CHUNK_OVERLAP", "100"))
     if not 100 <= page_size <= 10000:
         raise ValueError("CMS_PAGE_SIZE must be between 100 and 10000.")
+    if not page_size <= write_batch_size <= 100000:
+        raise ValueError("CMS_WRITE_BATCH_SIZE must be between CMS_PAGE_SIZE and 100000.")
     if not 1 <= maximum <= 100:
         raise ValueError("MAX_OPENFDA_PRODUCTS must be between 1 and 100.")
     if chunk_size <= 0 or overlap < 0 or overlap >= chunk_size:
@@ -87,9 +91,9 @@ def load_config() -> ProjectConfig:
         schema=_identifier("SCHEMA", "pharma_market_intelligence"),
         volume=_identifier("VOLUME", "pharma_pipeline"),
         states=_states(), years=years, cms_mode=mode, cms_page_size=page_size,
+        cms_write_batch_size=write_batch_size,
         max_openfda_products=maximum,
         app_schema=_identifier("APP_SCHEMA", "pharma_intelligence"),
         embedding_model_name=os.getenv("EMBEDDING_MODEL_NAME", "sentence-transformers/all-MiniLM-L6-v2"),
         chunk_size=chunk_size, chunk_overlap=overlap,
     )
-

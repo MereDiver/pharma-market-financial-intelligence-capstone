@@ -20,7 +20,7 @@ This is not a medical diagnosis/treatment assistant, an investment application, 
 CMS Medicaid SDUD 2024/2025               openFDA NDC + Drug Label APIs
            |                                          |
            v                                          v
- bounded API pages / streaming CSV           top <= 50 products only
+ bounded API pages / streaming CSV           top 20 products by default
            |                                          |
            v                                          v
  Spark Medallion pipeline                 structured metadata + label text
@@ -62,11 +62,11 @@ The upstream assignment requirements are documented at <https://github.com/EcZac
 - [CMS Open Data API](https://data.medicaid.gov/about/api)
 - [openFDA NDC](https://open.fda.gov/apis/drug/ndc/) and [Drug Label](https://open.fda.gov/apis/drug/label/)
 
-Default analysis is intentionally bounded to 2024–2025 and CA, TX, NY, FL, and IL. `MEDICAID_STATES` can expand later. Only the top 50 products by reimbursement across the selected scope are submitted for openFDA enrichment. No synthetic reimbursement records are generated or required.
+Default analysis is intentionally bounded to 2024–2025 and CA, TX, NY, FL, and IL. `MEDICAID_STATES` can expand later. The top 20 products by reimbursement across the selected scope are submitted for openFDA enrichment by default; `MAX_OPENFDA_PRODUCTS` is configurable up to 100. No synthetic reimbursement records are generated or required.
 
 ### CMS ingestion modes
 
-`CMS_MODE=api` is preferred. `cms_medicaid_client.py` uses the official datastore route, one state/year dataset at a time, with indexed state conditions, bounded `limit`/`offset`, timeouts, and retries for 429/5xx. Each page is written to Delta before the next page is requested; annual data is never accumulated in Python memory.
+`CMS_MODE=api` is preferred. `cms_medicaid_client.py` uses the official datastore route, one state/year dataset at a time, with indexed state conditions, bounded `limit`/`offset`, timeouts, and retries for 429/5xx. API pages are buffered into bounded 50,000-row Delta writes; annual data is never accumulated in Python memory.
 
 `CMS_MODE=bulk_csv` is the reliable fallback. It streams each official annual CSV through `csv.DictReader`, keeps only configured states, and passes bounded batches to Spark. It never reads the complete annual file into driver memory. The public URLs are encoded in `config/project_config.py`; source data is deliberately excluded from the repository and submission ZIP.
 
@@ -81,7 +81,7 @@ Bronze record hashes make reruns idempotent. The staging table is merged only af
    - `gold_drug_performance_yoy` for identical-quarter 2025-versus-2024 comparisons;
    - `gold_state_performance` for compact state/utilization KPIs;
    - `gold_portfolio_summary` for compact portfolio KPIs.
-4. `04_enrich_openfda.py` selects at most 50 products, attempts deterministic package-NDC forms, persists match status/method, metadata, and available label sections.
+4. `04_enrich_openfda.py` selects 20 products by default (configurable up to 100), attempts deterministic package-NDC forms, persists match status/method, metadata, and available label sections.
 5. `05_ingest_drug_embeddings.py` embeds only new/content-changed documents.
 
 All stages are sequential, the Job is manually triggered, and `max_concurrent_runs` is one. The frontend never reruns Spark.

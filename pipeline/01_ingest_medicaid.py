@@ -5,7 +5,13 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+# Databricks serverless executes Python files through ``exec`` and does not
+# always populate ``__file__``. Its wrapper does expose the source as
+# ``filename``, while normal Python execution continues to use ``__file__``.
+SOURCE_PATH = globals().get("__file__") or globals().get("filename")
+if not SOURCE_PATH:
+    raise RuntimeError("Unable to determine the pipeline source path.")
+ROOT = Path(str(SOURCE_PATH)).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
@@ -45,14 +51,24 @@ def main() -> None:
     schema = RAW_SCHEMA.add("source_year", T.IntegerType(), False).add("source_mode", T.StringType(), False).add("source_identifier", T.StringType(), False).add("source_url", T.StringType(), False)
     client = CMSMedicaidClient(page_size=cfg.cms_page_size)
     wrote = False
+    buffered_rows: list[dict] = []
 
-    def persist(records: list[dict], year: int, identifier: str, url: str) -> None:
-        nonlocal wrote
-        rows = _canonical_rows(records, year, cfg.cms_mode, identifier, url)
-        frame = spark.createDataFrame(rows, schema=schema)
+    def flush() -> None:
+        nonlocal wrote, buffered_rows
+        if not buffered_rows:
+            return
+        rows_to_write, buffered_rows = buffered_rows, []
+        frame = spark.createDataFrame(rows_to_write, schema=schema)
         mode = "append" if wrote else "overwrite"
         frame.write.format("delta").mode(mode).option("overwriteSchema", "true").saveAsTable(stage)
         wrote = True
+
+    def persist(records: list[dict], year: int, identifier: str, url: str) -> None:
+        nonlocal buffered_rows
+        rows = _canonical_rows(records, year, cfg.cms_mode, identifier, url)
+        buffered_rows.extend(rows)
+        if len(buffered_rows) >= cfg.cms_write_batch_size:
+            flush()
 
     for year in cfg.years:
         source = CMS_DATASETS[year]
@@ -65,6 +81,7 @@ def main() -> None:
             for page in client.iter_bulk_batches(source["bulk_url"], set(cfg.states)):
                 persist(page, year, source["dataset_id"], source["bulk_url"])
 
+    flush()
     if not wrote:
         raise RuntimeError("CMS returned no records for the configured scope.")
     staged = spark.table(stage).withColumn(
