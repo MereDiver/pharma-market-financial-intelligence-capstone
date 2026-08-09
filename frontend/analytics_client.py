@@ -14,7 +14,7 @@ VALID_STATES = {"CA", "TX", "NY", "FL", "IL"}
 
 def _table(name: str) -> str:
     allowed = {"quarterly": "gold_drug_performance_quarterly", "yoy": "gold_drug_performance_yoy"}
-    catalog, schema = os.getenv("CATALOG", "main"), os.getenv("SCHEMA", "pharma_market_intelligence")
+    catalog, schema = os.getenv("CATALOG", "workspace"), os.getenv("SCHEMA", "pharma_market_intelligence")
     if name not in allowed or not catalog.replace("_", "a").isalnum() or not schema.replace("_", "a").isalnum():
         raise ValueError("Invalid governed table configuration.")
     return f"`{catalog}`.`{schema}`.`{allowed[name]}`"
@@ -74,4 +74,3 @@ def dashboard(year: int, quarter: int | None, state: str | None) -> dict[str, An
     return {"kpis": kpis[0] if kpis else {}, "yoy": yoy[0] if yoy else {},
             "positive_movers": [row for row in movers if float(row["contribution"]) >= 0][:6],
             "negative_movers": [row for row in movers if float(row["contribution"]) < 0][:6]}
-

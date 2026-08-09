@@ -4,7 +4,7 @@ bundle:
 variables:
   catalog:
     description: Existing Unity Catalog catalog
-    default: main
+    default: workspace
   schema:
     description: Capstone analytical schema
     default: pharma_market_intelligence

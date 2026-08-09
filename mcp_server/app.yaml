@@ -9,7 +9,7 @@ env:
   - name: APP_SCHEMA
     value: pharma_intelligence
   - name: CATALOG
-    value: main
+    value: workspace
   - name: SCHEMA
     value: pharma_market_intelligence
   - name: EMBEDDING_MODEL_NAME

@@ -12,6 +12,7 @@ def test_bounded_performance_defaults(monkeypatch) -> None:
 
     config = load_config()
 
+    assert config.catalog == "workspace"
     assert config.cms_page_size == 10000
     assert config.cms_write_batch_size == 50000
     assert config.max_openfda_products == 20

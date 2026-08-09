@@ -49,7 +49,7 @@ def qualified_table(table_name: str) -> str:
     }
     if table_name not in allowed:
         raise ValueError("Unknown governed table alias.")
-    catalog = os.getenv("CATALOG", "main")
+    catalog = os.getenv("CATALOG", "workspace")
     schema = os.getenv("SCHEMA", "pharma_market_intelligence")
     if not re_identifier(catalog) or not re_identifier(schema):
         raise SQLWarehouseError("CATALOG and SCHEMA must be valid identifiers.")
@@ -58,4 +58,3 @@ def qualified_table(table_name: str) -> str:
 
 def re_identifier(value: str) -> bool:
     return bool(value and value.replace("_", "a").isalnum() and not value[0].isdigit())
-
