@@ -4,6 +4,30 @@ const number=value=>value==null?'—':new Intl.NumberFormat('en-US',{notation:'c
 const percent=value=>value==null?'—':new Intl.NumberFormat('en-US',{style:'percent',maximumFractionDigits:1,signDisplay:'exceptZero'}).format(Number(value));
 const escapeHtml=value=>{const node=document.createElement('div');node.textContent=String(value??'');return node.innerHTML};
 
+function renderMarkdown(value){
+  const inline=text=>escapeHtml(text)
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/`([^`]+)`/g,'<code>$1</code>');
+  const lines=String(value??'').replace(/\r\n?/g,'\n').split('\n'),html=[];
+  let list=null;
+  const closeList=()=>{if(list){html.push(`</${list}>`);list=null}};
+  for(const line of lines){
+    const heading=line.match(/^#{1,6}\s+(.+)$/);
+    const ordered=line.match(/^\d+\.\s+(.+)$/);
+    const unordered=line.match(/^[-*]\s+(.+)$/);
+    if(heading){closeList();html.push(`<h4>${inline(heading[1])}</h4>`);continue}
+    if(ordered||unordered){
+      const type=ordered?'ol':'ul';
+      if(list!==type){closeList();html.push(`<${type}>`);list=type}
+      html.push(`<li>${inline((ordered||unordered)[1])}</li>`);continue
+    }
+    closeList();
+    if(line.trim())html.push(`<p>${inline(line)}</p>`);
+  }
+  closeList();
+  return html.join('');
+}
+
 async function jsonFetch(url,options){const response=await fetch(url,options);const data=await response.json();if(!response.ok||data.status==='error')throw new Error(data.message||'Request failed');return data}
 
 function moverHtml(row){const value=Number(row.contribution);return `<div class="mover"><strong>${escapeHtml(row.display_product_name||row.product_key)}</strong><span class="${value>=0?'up':'down'}">${money(value)}</span><small>${escapeHtml(row.product_key)}</small></div>`}
@@ -18,7 +42,7 @@ async function loadDashboard(){
   }catch(error){$('positiveMovers').innerHTML=`<p class="empty">${escapeHtml(error.message)}</p>`}finally{$('refresh').disabled=false}}
 
 async function ask(event){event.preventDefault();const input=$('question'),message=input.value.trim();if(!message)return;const conversation=$('conversation');conversation.insertAdjacentHTML('beforeend',`<div class="user-message"><div>${escapeHtml(message)}</div></div><div id="thinking" class="agent-message loading"><div class="avatar">AI</div><div>Investigating governed data and evidence…</div></div>`);conversation.scrollTop=conversation.scrollHeight;input.value='';
-  try{const data=await jsonFetch('/api/agent',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message})});$('thinking').remove();conversation.insertAdjacentHTML('beforeend',`<div class="agent-message"><div class="avatar">AI</div><div><strong>Agent conclusion</strong><p>${escapeHtml(data.answer)}</p></div></div>`);await loadWorkspace()}catch(error){$('thinking').remove();conversation.insertAdjacentHTML('beforeend',`<div class="agent-message"><div class="avatar">!</div><div>${escapeHtml(error.message)}</div></div>`)}conversation.scrollTop=conversation.scrollHeight}
+  try{const data=await jsonFetch('/api/agent',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message})});$('thinking').remove();conversation.insertAdjacentHTML('beforeend',`<div class="agent-message"><div class="avatar">AI</div><div class="agent-response"><strong>Agent conclusion</strong>${renderMarkdown(data.answer)}</div></div>`);await loadWorkspace()}catch(error){$('thinking').remove();conversation.insertAdjacentHTML('beforeend',`<div class="agent-message"><div class="avatar">!</div><div>${escapeHtml(error.message)}</div></div>`)}conversation.scrollTop=conversation.scrollHeight}
 
 function investigationHtml(row){return `<div class="record"><div class="record-head"><div><h3>${escapeHtml(row.title)}</h3><p>${escapeHtml(row.summary)}</p></div><span class="tag">${escapeHtml(row.status)}</span></div></div>`}
 function actionHtml(row){return `<div class="record"><div class="record-head"><div><h3>${escapeHtml(row.action_text)}</h3><p>Due ${escapeHtml(row.due_date||'not set')}</p></div><span class="tag priority-${escapeHtml(row.priority)}">${escapeHtml(row.priority)}</span></div>${row.status==='open'?`<div class="action-controls"><button data-complete="${escapeHtml(row.action_id)}">Mark completed</button></div>`:`<span class="tag">${escapeHtml(row.status)}</span>`}</div>`}
@@ -26,4 +50,3 @@ async function loadWorkspace(){try{const data=await jsonFetch('/api/workspace');
 
 document.addEventListener('click',async event=>{const prompt=event.target.dataset.prompt;if(prompt)$('question').value=prompt;const id=event.target.dataset.complete;if(id){event.target.disabled=true;try{await jsonFetch(`/api/actions/${id}/complete`,{method:'POST'});await loadWorkspace()}catch(error){event.target.textContent=error.message}}});
 $('agentForm').addEventListener('submit',ask);$('refresh').addEventListener('click',loadDashboard);$('reloadWorkspace').addEventListener('click',loadWorkspace);loadDashboard();loadWorkspace();
-
