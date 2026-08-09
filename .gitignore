@@ -16,4 +16,4 @@ delta/
 screenshots/
 .cache/
 hf_cache/
-
+.databricks/

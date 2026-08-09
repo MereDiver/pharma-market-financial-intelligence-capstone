@@ -20,6 +20,9 @@ variables:
   cms_mode:
     description: api or bulk_csv
     default: api
+  lakebase_endpoint_name:
+    description: Existing Lakebase endpoint full resource name; set outside Git
+    default: ""
 resources:
   jobs:
     pharma_intelligence_pipeline:
@@ -37,7 +40,7 @@ resources:
         - name: max_openfda_products
           default: "20"
         - name: lakebase_endpoint_name
-          default: ""
+          default: ${var.lakebase_endpoint_name}
         - name: lakebase_database
           default: databricks_postgres
       tasks:

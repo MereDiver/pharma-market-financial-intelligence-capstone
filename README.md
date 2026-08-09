@@ -149,18 +149,27 @@ It creates no new Lakebase project, AI Search endpoint, GPU endpoint, monitoring
 - Choose an existing Unity Catalog catalog and grant the pipeline identity permission to create/use the capstone schema/tables.
 - Ensure serverless Job outbound access can reach `data.medicaid.gov`, `download.medicaid.gov`, `api.fda.gov`, and the model download host. If CMS outbound access is blocked, manually place the official file in an allowed location or run the documented streaming fallback from an environment with access; never replace it with synthetic data.
 
-### 2. Configure and deploy the manual Job
+### 2. Configure and deploy the Job
 
-The final two tasks accept the existing Lakebase endpoint resource name as a runtime Job parameter. The code obtains the endpoint host and current Job identity through the Databricks SDK, then generates a short-lived OAuth credential. No PostgreSQL host, user, password, or OAuth token is committed.
+The final two tasks accept the existing Lakebase endpoint resource name as a Job parameter. The code obtains the endpoint host and current Job identity through the Databricks SDK, then generates a short-lived OAuth credential. No PostgreSQL host, user, password, or OAuth token is committed.
+
+To save the non-secret endpoint resource name locally without committing it, create `.databricks/bundle/dev/variable-overrides.json` containing:
+
+```json
+{
+  "lakebase_endpoint_name": "projects/<project>/branches/<branch>/endpoints/<endpoint>"
+}
+```
+
+The `.databricks/` directory is Git-ignored. The resolved value becomes the deployed Job parameter default, so manual and scheduled runs reuse it.
 
 ```bash
 databricks bundle validate -t dev
 databricks bundle deploy -t dev
-databricks bundle run -t dev pharma_intelligence_pipeline -- \
-  --lakebase_endpoint_name="projects/<project>/branches/<branch>/endpoints/<endpoint>"
+databricks bundle run -t dev pharma_intelligence_pipeline
 ```
 
-Alternatively, open the deployed Job, select **Run now with different settings**, and set `lakebase_endpoint_name`; `lakebase_database` defaults to `databricks_postgres`. Use the endpoint's full resource name from Lakebase **Computes > Get ID > Copy resource name**. The Job's **Run as** identity must have an OAuth Postgres role and permission to inspect that endpoint.
+Alternatively, open the deployed Job, select **Run now with different settings**, and override `lakebase_endpoint_name` for that run; `lakebase_database` defaults to `databricks_postgres`. Use the endpoint's full resource name from Lakebase **Computes > Get ID > Copy resource name**. The Job's **Run as** identity must have an OAuth Postgres role and permission to inspect that endpoint.
 
 Use `--var="cms_mode=bulk_csv"` only for the fallback. Run once initially; there is no schedule. Inspect counts, suppression nulls, representative Gold metrics, openFDA match statuses, document counts, embedding counts, and decomposition reconciliation before App deployment.
 
