@@ -18,9 +18,25 @@ except ModuleNotFoundError:  # pragma: no cover
                             validate_allowed, validate_due_date, validate_text, validate_uuid)
 
 
-def save_investigation(title: str, question: str, summary: str, scope: dict[str, Any] | None,
-                       findings: list[dict[str, Any]] | None) -> dict[str, Any]:
-    lakebase.ensure_schema()
+def _scope_payload(scope: dict[str, Any] | str | None) -> dict[str, Any]:
+    if isinstance(scope, dict):
+        return scope
+    if isinstance(scope, str):
+        return {"description": validate_text(scope, "scope")}
+    return {}
+
+
+def _finding_payloads(findings: list[dict[str, Any]] | str | None) -> list[dict[str, Any]]:
+    if isinstance(findings, str):
+        return [{"finding_type": "observation", "finding_text": validate_text(findings, "findings"), "evidence": {}}]
+    return findings or []
+
+
+def save_investigation(title: str, question: str, summary: str,
+                       scope: dict[str, Any] | str | None,
+                       findings: list[dict[str, Any]] | str | None) -> dict[str, Any]:
+    # Schema DDL belongs to the ingestion/deployment path. Runtime App roles use
+    # least-privilege DML grants and must not need ownership of existing tables.
     investigation_id = str(uuid4())
     title = validate_text(title, "title", 300)
     question = validate_text(question, "question")
@@ -30,8 +46,8 @@ def save_investigation(title: str, question: str, summary: str, scope: dict[str,
         try:
             with connection.cursor() as cursor:
                 cursor.execute(sql.SQL("INSERT INTO {}.investigations (investigation_id,title,question,summary,scope,status) VALUES (%s,%s,%s,%s,%s::jsonb,'open')").format(schema),
-                               (investigation_id, title, question, summary, json.dumps(scope or {})))
-                for finding in findings or []:
+                               (investigation_id, title, question, summary, json.dumps(_scope_payload(scope))))
+                for finding in _finding_payloads(findings):
                     cursor.execute(sql.SQL("INSERT INTO {}.investigation_findings (finding_id,investigation_id,finding_type,finding_text,evidence) VALUES (%s,%s,%s,%s,%s::jsonb)").format(schema),
                                    (str(uuid4()), investigation_id, validate_text(finding.get("finding_type", "observation"), "finding_type", 100),
                                     validate_text(finding.get("finding_text"), "finding_text"), json.dumps(finding.get("evidence") or {})))

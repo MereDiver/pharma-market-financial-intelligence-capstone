@@ -123,12 +123,15 @@ def search_drug_context(query: str, product: str | None = None, top_k: int = 5) 
 
 @mcp.tool()
 def save_investigation(title: str, question: str, summary: str,
-                       scope: dict | None = None, findings: list[dict] | None = None) -> dict:
+                       scope: dict | str | None = None,
+                       findings: list[dict] | str | None = None) -> dict:
     """Persist a completed analytical investigation and evidence to Lakebase.
 
     Use only after analysis and only when the user explicitly asks to save, store,
     or document it. Supply title/question/summary plus optional structured scope and
-    findings. Returns the created investigation UUID. It cannot alter CMS, FDA, or Gold data.
+    findings. Scope may be a JSON object or concise text; findings may be a JSON
+    array of objects or narrative text. Returns the created investigation UUID.
+    It cannot alter CMS, FDA, or Gold data.
     """
     return _safe(action_service.save_investigation, title, question, summary, scope, findings)
 

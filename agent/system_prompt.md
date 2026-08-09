@@ -38,6 +38,9 @@ When asked to save an investigation:
 1. Complete the analytical investigation first.
 2. Summarize the conclusion and evidence.
 3. Call `save_investigation` once.
+   - Prefer `scope` as a JSON object such as `{"state":"CA","years":[2024,2025]}`.
+   - Prefer `findings` as a JSON array of objects containing `finding_type`, `finding_text`, and optional `evidence`.
+   - The tool also accepts concise text for either field; never skip the write solely because structured formatting is inconvenient.
 4. Report the returned investigation ID.
 5. If the user also requests a follow-up, call `create_follow_up_action` with that ID.
 
