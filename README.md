@@ -6,7 +6,7 @@
 
 This capstone is a public-data prototype for Pharma Finance/Controlling, Market Access, Commercial Analytics, Portfolio Analytics, and Finance Business Partners. It turns official CMS Medicaid State Drug Utilization records into a governed Spark analytical layer, enriches a deliberately small product set with openFDA metadata and Drug Label text, retrieves label context through Lakebase pgvector, and lets an Agent Bricks agent both investigate evidence and perform safe operational writes.
 
-The application answers questions such as which products or states contributed to reimbursement change, whether movement reflects prescription volume or reimbursement per prescription, which observations are unusual under a transparent statistical rule, and what matched FDA label context says about a product. Users can explicitly save an investigation, add a note, or create/complete a follow-up without granting the agent permission to alter facts.
+The application answers questions such as which products or quarters contributed to reimbursement change, whether movement reflects prescription volume or reimbursement per prescription, which observations are unusual under a transparent statistical rule, and what matched FDA label context says about a product. Users can explicitly save an investigation, add a note, or create/complete a follow-up without granting the agent permission to alter facts.
 
 ### Data disclaimer
 
@@ -20,7 +20,7 @@ This is not a medical diagnosis/treatment assistant, an investment application, 
 CMS Medicaid SDUD 2024/2025               openFDA NDC + Drug Label APIs
            |                                          |
            v                                          v
- bounded API pages / streaming CSV           top 20 products by default
+ bounded API pages / streaming CSV           top 10 products by default
            |                                          |
            v                                          v
  Spark Medallion pipeline                 structured metadata + label text
@@ -62,7 +62,7 @@ The upstream assignment requirements are documented at <https://github.com/EcZac
 - [CMS Open Data API](https://data.medicaid.gov/about/api)
 - [openFDA NDC](https://open.fda.gov/apis/drug/ndc/) and [Drug Label](https://open.fda.gov/apis/drug/label/)
 
-Default analysis is intentionally bounded to 2024–2025 and CA, TX, NY, FL, and IL. `MEDICAID_STATES` can expand later. The top 20 products by reimbursement across the selected scope are submitted for openFDA enrichment by default; `MAX_OPENFDA_PRODUCTS` is configurable up to 100. No synthetic reimbursement records are generated or required.
+Default analysis is intentionally bounded to California for 2024–2025 so the complete pipeline runs safely in Databricks Free Edition. `MEDICAID_STATES` can expand later. The top 10 products by reimbursement are submitted for openFDA enrichment by default; `MAX_OPENFDA_PRODUCTS` is configurable up to 100. No synthetic reimbursement records are generated or required.
 
 ### CMS ingestion modes
 
@@ -81,7 +81,7 @@ Bronze record hashes make reruns idempotent. The staging table is merged only af
    - `gold_drug_performance_yoy` for identical-quarter 2025-versus-2024 comparisons;
    - `gold_state_performance` for compact state/utilization KPIs;
    - `gold_portfolio_summary` for compact portfolio KPIs.
-4. `04_enrich_openfda.py` selects 20 products by default (configurable up to 100), attempts deterministic package-NDC forms, persists match status/method, metadata, and available label sections.
+4. `04_enrich_openfda.py` selects 10 products by default (configurable up to 100), attempts deterministic package-NDC forms, persists match status/method, metadata, and available label sections.
 5. `05_ingest_drug_embeddings.py` embeds only new/content-changed documents.
 
 All stages are sequential, the Job is manually triggered, and `max_concurrent_runs` is one. The frontend never reruns Spark.
@@ -231,7 +231,7 @@ Bundle schema can be checked with `databricks bundle validate`; workspace resolu
 
 ## Limitations
 
-- Default analysis covers five selected states and two years, not a national or long-term market view.
+- Default analysis covers California and two years, not a multi-state, national, or long-term market view.
 - CMS suppression makes some values unavailable; exclusion reduces comparability and suppressed values are never interpreted as zero.
 - CMS reimbursement is not manufacturer sales, and reimbursement per prescription is not list/net price.
 - FDA native/package NDC reconciliation is imperfect; fallback and unmatched status must be considered.

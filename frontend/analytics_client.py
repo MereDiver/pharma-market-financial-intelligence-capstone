@@ -9,7 +9,7 @@ from typing import Any
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.sql import Disposition, Format, StatementParameterListItem, StatementState
 
-VALID_STATES = {"CA", "TX", "NY", "FL", "IL"}
+VALID_STATES = {"CA"}
 
 
 def _table(name: str) -> str:
