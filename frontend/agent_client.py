@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac
+import json
 import os
+import time
 from typing import Any
 
 from databricks.sdk import WorkspaceClient
@@ -17,6 +22,7 @@ READ_ONLY_TOOLS = {
     "search_drug_context",
 }
 MAX_APPROVAL_ROUNDS = 10
+APPROVAL_TTL_SECONDS = 15 * 60
 
 
 def _approval_requests(response: dict[str, Any]) -> list[dict[str, Any]]:
@@ -65,16 +71,66 @@ def _extract_answer(response: dict[str, Any]) -> str | None:
     return content if isinstance(content, str) else answer if isinstance(answer, str) else None
 
 
-def ask_agent(message: str) -> dict[str, Any]:
-    endpoint = os.getenv("AGENT_ENDPOINT")
-    if not endpoint:
-        raise RuntimeError("AGENT_ENDPOINT is not configured from the finance-agent App resource.")
-    prompt = " ".join(str(message or "").split())
-    if not prompt or len(prompt) > 8000:
-        raise ValueError("Question must be between 1 and 8000 characters.")
+def _signing_key() -> bytes:
+    key = os.getenv("APPROVAL_SIGNING_KEY") or os.getenv("DATABRICKS_CLIENT_SECRET")
+    if not key:
+        raise RuntimeError("The App runtime approval-signing credential is unavailable.")
+    return key.encode("utf-8")
+
+
+def _encode_approval(context: dict[str, Any]) -> str:
+    payload = json.dumps(context, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    signature = hmac.new(_signing_key(), payload, hashlib.sha256).digest()
+    return base64.urlsafe_b64encode(signature + payload).decode("ascii")
+
+
+def _decode_approval(token: str) -> dict[str, Any]:
+    try:
+        signed = base64.b64decode(str(token), altchars=b"-_", validate=True)
+        signature, payload = signed[:32], signed[32:]
+        expected = hmac.new(_signing_key(), payload, hashlib.sha256).digest()
+        if len(signature) != 32 or not hmac.compare_digest(signature, expected):
+            raise ValueError
+        context = json.loads(payload)
+    except (TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise ValueError("The write approval is invalid. Start the investigation again.") from exc
+    issued_at = context.get("issued_at")
+    if not isinstance(issued_at, int) or not 0 <= time.time() - issued_at <= APPROVAL_TTL_SECONDS:
+        raise ValueError("The write approval expired. Start the investigation again.")
+    if not isinstance(context.get("history"), list) or not isinstance(context.get("approvals"), list):
+        raise ValueError("The write approval is invalid. Start the investigation again.")
+    return context
+
+
+def _approval_result(endpoint: str, history: list[dict[str, Any]],
+                     approvals: list[dict[str, Any]]) -> dict[str, Any]:
+    proposed = [
+        {
+            "id": request.get("id"),
+            "name": request.get("name", "unknown"),
+            "server_label": request.get("server_label"),
+            "arguments": request.get("arguments", "{}"),
+        }
+        for request in approvals
+    ]
+    token = _encode_approval({
+        "issued_at": int(time.time()),
+        "endpoint": endpoint,
+        "history": history,
+        "approvals": proposed,
+    })
+    names = ", ".join(str(request["name"]) for request in proposed)
+    return {
+        "answer": f"Review and approve the proposed write: {names}.",
+        "approval_required": True,
+        "approval_token": token,
+        "proposed_writes": proposed,
+    }
+
+
+def _run_agent(endpoint: str, history: list[dict[str, Any]]) -> dict[str, Any]:
     client = WorkspaceClient()
     path = f"/serving-endpoints/{endpoint}/invocations"
-    history: list[dict[str, Any]] = [{"role": "user", "content": prompt}]
     response: Any = None
     for _ in range(MAX_APPROVAL_ROUNDS):
         response = client.api_client.do("POST", path, body={"input": history})
@@ -83,17 +139,10 @@ def ask_agent(message: str) -> dict[str, Any]:
         approvals = _approval_requests(response)
         if not approvals:
             break
-        protected = [request.get("name", "unknown") for request in approvals
-                     if request.get("name") not in READ_ONLY_TOOLS]
-        if protected:
-            names = ", ".join(protected)
-            return {
-                "answer": f"Explicit approval is required before running: {names}.",
-                "approval_required": True,
-                "raw": response,
-            }
         output = response.get("output") or []
         history.extend(item for item in output if isinstance(item, dict))
+        protected = [request for request in approvals if request.get("name") not in READ_ONLY_TOOLS]
+        read_only = [request for request in approvals if request.get("name") in READ_ONLY_TOOLS]
         history.extend(
             {
                 "type": "mcp_approval_response",
@@ -101,10 +150,43 @@ def ask_agent(message: str) -> dict[str, Any]:
                 "approval_request_id": request["id"],
                 "approve": True,
             }
-            for request in approvals
+            for request in read_only
         )
+        if protected:
+            return _approval_result(endpoint, history, protected)
     else:
         raise RuntimeError("The agent exceeded the maximum number of MCP approval rounds.")
 
     answer = _extract_answer(response)
     return {"answer": answer or "The agent returned no displayable answer.", "raw": response}
+
+
+def ask_agent(message: str) -> dict[str, Any]:
+    endpoint = os.getenv("AGENT_ENDPOINT")
+    if not endpoint:
+        raise RuntimeError("AGENT_ENDPOINT is not configured from the finance-agent App resource.")
+    prompt = " ".join(str(message or "").split())
+    if not prompt or len(prompt) > 8000:
+        raise ValueError("Question must be between 1 and 8000 characters.")
+    return _run_agent(endpoint, [{"role": "user", "content": prompt}])
+
+
+def continue_agent(approval_token: str, approve: bool) -> dict[str, Any]:
+    context = _decode_approval(approval_token)
+    endpoint = os.getenv("AGENT_ENDPOINT")
+    if not endpoint or context.get("endpoint") != endpoint:
+        raise ValueError("The Agent endpoint changed. Start the investigation again.")
+    if not approve:
+        return {"answer": "The proposed write was cancelled.", "approval_cancelled": True}
+    history = context["history"]
+    for request in context["approvals"]:
+        request_id = request.get("id")
+        if not isinstance(request_id, str) or not request_id:
+            raise ValueError("The write approval is invalid. Start the investigation again.")
+        history.append({
+            "type": "mcp_approval_response",
+            "id": request_id,
+            "approval_request_id": request_id,
+            "approve": True,
+        })
+    return _run_agent(endpoint, history)

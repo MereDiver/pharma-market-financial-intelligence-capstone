@@ -51,6 +51,15 @@ def agent():
     return jsonify({"status": "success", **safe(agent_client.ask_agent(payload.get("message", "")))})
 
 
+@app.post("/api/agent/approval")
+def agent_approval():
+    payload = request.get_json(silent=True) or {}
+    if not isinstance(payload.get("approve"), bool):
+        raise ValueError("approve must be true or false.")
+    result = agent_client.continue_agent(payload.get("approval_token", ""), payload["approve"])
+    return jsonify({"status": "success", **safe(result)})
+
+
 @app.get("/api/workspace")
 def workspace():
     return jsonify({"status": "success", "investigations": safe(lakebase.investigations()),
@@ -73,4 +82,3 @@ def error_handler(error: Exception):
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.getenv("DATABRICKS_APP_PORT", "8001")))
-

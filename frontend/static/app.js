@@ -32,6 +32,22 @@ async function jsonFetch(url,options){const response=await fetch(url,options);co
 
 function moverHtml(row){const value=Number(row.contribution);return `<div class="mover"><strong>${escapeHtml(row.display_product_name||row.product_key)}</strong><span class="${value>=0?'up':'down'}">${money(value)}</span><small>${escapeHtml(row.product_key)}</small></div>`}
 
+let pendingApprovalToken=null;
+function approvalArguments(value){
+  try{return JSON.stringify(typeof value==='string'?JSON.parse(value):value,null,2)}catch{return String(value??'{}')}
+}
+function renderAgentResult(data){
+  const conversation=$('conversation');
+  if(data.approval_required){
+    pendingApprovalToken=data.approval_token;
+    const writes=(data.proposed_writes||[]).map(write=>`<div class="approval-tool"><strong>${escapeHtml(write.name)}</strong><pre>${escapeHtml(approvalArguments(write.arguments))}</pre></div>`).join('');
+    conversation.insertAdjacentHTML('beforeend',`<div class="agent-message approval-message"><div class="avatar">AI</div><div class="agent-response"><strong>Write approval required</strong><p>Review the proposed governed operation before it changes Lakebase.</p>${writes}<div class="approval-controls"><button type="button" class="secondary" data-agent-approval="false">Cancel</button><button type="button" class="primary" data-agent-approval="true">Approve and continue</button></div></div></div>`);
+    return;
+  }
+  pendingApprovalToken=null;
+  conversation.insertAdjacentHTML('beforeend',`<div class="agent-message"><div class="avatar">AI</div><div class="agent-response"><strong>Agent conclusion</strong>${renderMarkdown(data.answer)}</div></div>`);
+}
+
 async function loadDashboard(){
   $('refresh').disabled=true;
   try{const query=new URLSearchParams({year:$('year').value});if($('quarter').value)query.set('quarter',$('quarter').value);if($('state').value)query.set('state',$('state').value);
@@ -42,11 +58,25 @@ async function loadDashboard(){
   }catch(error){$('positiveMovers').innerHTML=`<p class="empty">${escapeHtml(error.message)}</p>`}finally{$('refresh').disabled=false}}
 
 async function ask(event){event.preventDefault();const input=$('question'),message=input.value.trim();if(!message)return;const conversation=$('conversation');conversation.insertAdjacentHTML('beforeend',`<div class="user-message"><div>${escapeHtml(message)}</div></div><div id="thinking" class="agent-message loading"><div class="avatar">AI</div><div>Investigating governed data and evidence…</div></div>`);conversation.scrollTop=conversation.scrollHeight;input.value='';
-  try{const data=await jsonFetch('/api/agent',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message})});$('thinking').remove();conversation.insertAdjacentHTML('beforeend',`<div class="agent-message"><div class="avatar">AI</div><div class="agent-response"><strong>Agent conclusion</strong>${renderMarkdown(data.answer)}</div></div>`);await loadWorkspace()}catch(error){$('thinking').remove();conversation.insertAdjacentHTML('beforeend',`<div class="agent-message"><div class="avatar">!</div><div>${escapeHtml(error.message)}</div></div>`)}conversation.scrollTop=conversation.scrollHeight}
+  try{const data=await jsonFetch('/api/agent',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message})});$('thinking').remove();renderAgentResult(data);await loadWorkspace()}catch(error){$('thinking').remove();conversation.insertAdjacentHTML('beforeend',`<div class="agent-message"><div class="avatar">!</div><div>${escapeHtml(error.message)}</div></div>`)}conversation.scrollTop=conversation.scrollHeight}
+
+async function resolveApproval(approve,button){
+  if(!pendingApprovalToken)return;
+  const conversation=$('conversation'),token=pendingApprovalToken;
+  document.querySelectorAll('[data-agent-approval]').forEach(control=>control.disabled=true);
+  button.closest('.approval-message').classList.add(approve?'approved':'cancelled');
+  conversation.insertAdjacentHTML('beforeend',`<div id="approvalThinking" class="agent-message loading"><div class="avatar">AI</div><div>${approve?'Executing the approved operation…':'Cancelling the proposed operation…'}</div></div>`);
+  conversation.scrollTop=conversation.scrollHeight;
+  try{
+    const data=await jsonFetch('/api/agent/approval',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({approval_token:token,approve})});
+    $('approvalThinking').remove();renderAgentResult(data);if(approve)await loadWorkspace();
+  }catch(error){$('approvalThinking').remove();conversation.insertAdjacentHTML('beforeend',`<div class="agent-message"><div class="avatar">!</div><div>${escapeHtml(error.message)}</div></div>`)}
+  conversation.scrollTop=conversation.scrollHeight;
+}
 
 function investigationHtml(row){return `<div class="record"><div class="record-head"><div><h3>${escapeHtml(row.title)}</h3><p>${escapeHtml(row.summary)}</p></div><span class="tag">${escapeHtml(row.status)}</span></div></div>`}
 function actionHtml(row){return `<div class="record"><div class="record-head"><div><h3>${escapeHtml(row.action_text)}</h3><p>Due ${escapeHtml(row.due_date||'not set')}</p></div><span class="tag priority-${escapeHtml(row.priority)}">${escapeHtml(row.priority)}</span></div>${row.status==='open'?`<div class="action-controls"><button data-complete="${escapeHtml(row.action_id)}">Mark completed</button></div>`:`<span class="tag">${escapeHtml(row.status)}</span>`}</div>`}
 async function loadWorkspace(){try{const data=await jsonFetch('/api/workspace');$('investigations').innerHTML=data.investigations.length?data.investigations.map(investigationHtml).join(''):'<p class="empty">No saved investigations yet.</p>';$('actions').innerHTML=data.actions.length?data.actions.map(actionHtml).join(''):'<p class="empty">No follow-up actions yet.</p>'}catch(error){$('investigations').innerHTML=$('actions').innerHTML=`<p class="empty">${escapeHtml(error.message)}</p>`}}
 
-document.addEventListener('click',async event=>{const prompt=event.target.dataset.prompt;if(prompt)$('question').value=prompt;const id=event.target.dataset.complete;if(id){event.target.disabled=true;try{await jsonFetch(`/api/actions/${id}/complete`,{method:'POST'});await loadWorkspace()}catch(error){event.target.textContent=error.message}}});
+document.addEventListener('click',async event=>{const approval=event.target.dataset.agentApproval;if(approval)await resolveApproval(approval==='true',event.target);const prompt=event.target.dataset.prompt;if(prompt)$('question').value=prompt;const id=event.target.dataset.complete;if(id){event.target.disabled=true;try{await jsonFetch(`/api/actions/${id}/complete`,{method:'POST'});await loadWorkspace()}catch(error){event.target.textContent=error.message}}});
 $('agentForm').addEventListener('submit',ask);$('refresh').addEventListener('click',loadDashboard);$('reloadWorkspace').addEventListener('click',loadWorkspace);loadDashboard();loadWorkspace();

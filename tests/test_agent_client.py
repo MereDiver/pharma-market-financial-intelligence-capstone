@@ -90,7 +90,41 @@ def test_ask_agent_approves_read_only_mcp_call_and_continues(monkeypatch):
     assert result["answer"] == "The final evidence-based answer."
 
 
-def test_ask_agent_does_not_autoapprove_write_tool(monkeypatch):
+def test_write_tool_requires_signed_approval_then_continues(monkeypatch):
+    api_client = FakeAPIClient(
+        {"output": [{
+            "type": "mcp_approval_request",
+            "id": "write-123",
+            "name": "save_investigation",
+            "arguments": '{"title":"CA drivers"}',
+        }]},
+        {"output": [{"type": "message", "role": "assistant", "content": [
+            {"type": "output_text", "text": "Investigation saved as inv-123."}
+        ]}]},
+    )
+    FakeWorkspaceClient.api_client = api_client
+    monkeypatch.setenv("AGENT_ENDPOINT", "finance-supervisor")
+    monkeypatch.setenv("APPROVAL_SIGNING_KEY", "test-only-signing-key")
+    monkeypatch.setattr(agent_client, "WorkspaceClient", FakeWorkspaceClient)
+
+    result = agent_client.ask_agent("Save this investigation")
+
+    assert result["approval_required"] is True
+    assert result["proposed_writes"][0]["name"] == "save_investigation"
+    assert len(api_client.calls) == 1
+
+    completed = agent_client.continue_agent(result["approval_token"], True)
+
+    assert completed["answer"] == "Investigation saved as inv-123."
+    assert api_client.calls[1][2]["input"][-1] == {
+        "type": "mcp_approval_response",
+        "id": "write-123",
+        "approval_request_id": "write-123",
+        "approve": True,
+    }
+
+
+def test_write_approval_can_be_cancelled_and_cannot_be_tampered(monkeypatch):
     api_client = FakeAPIClient({"output": [{
         "type": "mcp_approval_request",
         "id": "write-123",
@@ -99,10 +133,15 @@ def test_ask_agent_does_not_autoapprove_write_tool(monkeypatch):
     }]})
     FakeWorkspaceClient.api_client = api_client
     monkeypatch.setenv("AGENT_ENDPOINT", "finance-supervisor")
+    monkeypatch.setenv("APPROVAL_SIGNING_KEY", "test-only-signing-key")
     monkeypatch.setattr(agent_client, "WorkspaceClient", FakeWorkspaceClient)
-
     result = agent_client.ask_agent("Save this investigation")
 
-    assert result["approval_required"] is True
-    assert "save_investigation" in result["answer"]
-    assert len(api_client.calls) == 1
+    assert agent_client.continue_agent(result["approval_token"], False)["approval_cancelled"] is True
+    tampered = result["approval_token"][:-2] + "AA"
+    try:
+        agent_client.continue_agent(tampered, True)
+    except ValueError as error:
+        assert "invalid" in str(error)
+    else:
+        raise AssertionError("Tampered approval token was accepted")
