@@ -31,7 +31,7 @@ def _csv_ints(name: str, default: str) -> tuple[int, ...]:
 
 
 def _states() -> tuple[str, ...]:
-    values = tuple(dict.fromkeys(value.strip().upper() for value in os.getenv("MEDICAID_STATES", "CA").split(",") if value.strip()))
+    values = tuple(dict.fromkeys(value.strip().upper() for value in os.getenv("MEDICAID_STATES", "CA,TX,NY,FL,IL").split(",") if value.strip()))
     if not values or any(not _STATE.fullmatch(value) for value in values):
         raise ValueError("MEDICAID_STATES must contain two-letter state codes.")
     return values
@@ -75,7 +75,7 @@ def load_config() -> ProjectConfig:
         raise ValueError(f"No CMS dataset configured for years: {unsupported}")
     page_size = int(os.getenv("CMS_PAGE_SIZE", "5000"))
     write_batch_size = int(os.getenv("CMS_WRITE_BATCH_SIZE", "50000"))
-    maximum = int(os.getenv("MAX_OPENFDA_PRODUCTS", "10"))
+    maximum = int(os.getenv("MAX_OPENFDA_PRODUCTS", "20"))
     chunk_size = int(os.getenv("CHUNK_SIZE", "800"))
     overlap = int(os.getenv("CHUNK_OVERLAP", "100"))
     if not 100 <= page_size <= 5000:

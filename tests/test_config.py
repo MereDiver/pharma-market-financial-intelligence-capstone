@@ -7,16 +7,16 @@ from config.project_config import load_config
 
 
 def test_bounded_performance_defaults(monkeypatch) -> None:
-    for name in ("CMS_PAGE_SIZE", "CMS_WRITE_BATCH_SIZE", "MAX_OPENFDA_PRODUCTS"):
+    for name in ("CMS_PAGE_SIZE", "CMS_WRITE_BATCH_SIZE", "MAX_OPENFDA_PRODUCTS", "MEDICAID_STATES"):
         monkeypatch.delenv(name, raising=False)
 
     config = load_config()
 
     assert config.catalog == "workspace"
-    assert config.states == ("CA",)
+    assert config.states == ("CA", "TX", "NY", "FL", "IL")
     assert config.cms_page_size == 5000
     assert config.cms_write_batch_size == 50000
-    assert config.max_openfda_products == 10
+    assert config.max_openfda_products == 20
 
 
 def test_runtime_scope_arguments(monkeypatch) -> None:

@@ -1,6 +1,6 @@
 # Submission checklist
 
-- [ ] Pipeline ran once for real 2024/2025 CMS California data and ten-product enrichment scope
+- [ ] Pipeline ran once for real 2024/2025 CMS data across CA, TX, NY, FL, and IL with a 20-product enrichment scope
 - [ ] Bronze, Silver, and four Gold tables verified
 - [ ] Suppressed records remain null/unavailable
 - [ ] openFDA matched/unmatched provenance inspected

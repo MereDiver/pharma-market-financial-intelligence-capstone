@@ -12,8 +12,8 @@ variables:
     description: Existing or capstone-managed volume name
     default: pharma_pipeline
   medicaid_states:
-    description: Comma-separated bounded demo states; California is the Free Edition default
-    default: CA
+    description: Comma-separated bounded five-state demo scope
+    default: CA,TX,NY,FL,IL
   medicaid_years:
     description: Comparison years
     default: 2024,2025
@@ -38,7 +38,7 @@ resources:
         - name: cms_mode
           default: ${var.cms_mode}
         - name: max_openfda_products
-          default: "10"
+          default: "20"
         - name: lakebase_endpoint_name
           default: ${var.lakebase_endpoint_name}
         - name: lakebase_database
