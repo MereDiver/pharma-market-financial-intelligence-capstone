@@ -9,13 +9,41 @@ function renderMarkdown(value){
     .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
     .replace(/`([^`]+)`/g,'<code>$1</code>');
   const lines=String(value??'').replace(/\r\n?/g,'\n').split('\n'),html=[];
+  const isPipeRow=line=>/^\s*\|.*\|\s*$/.test(line);
+  const cells=line=>line.trim().replace(/^\||\|$/g,'').split('|').map(cell=>cell.trim());
+  const isSeparator=row=>row.length>0&&row.every(cell=>/^:?-{3,}:?$/.test(cell));
+  const alignment=cell=>cell.startsWith(':')&&cell.endsWith(':')?'align-center':cell.endsWith(':')?'align-right':cell.startsWith(':')?'align-left':'';
   let list=null;
   const closeList=()=>{if(list){html.push(`</${list}>`);list=null}};
-  for(const line of lines){
+  for(let index=0;index<lines.length;index++){
+    const line=lines[index];
+    if(isPipeRow(line)){
+      const rows=[];
+      let cursor=index;
+      while(cursor<lines.length){
+        if(isPipeRow(lines[cursor])){rows.push(lines[cursor]);cursor++;continue}
+        if(!lines[cursor].trim()){
+          let next=cursor;
+          while(next<lines.length&&!lines[next].trim())next++;
+          if(next<lines.length&&isPipeRow(lines[next])){cursor=next;continue}
+        }
+        break;
+      }
+      const parsed=rows.map(cells);
+      if(parsed.length>=2&&isSeparator(parsed[1])){
+        closeList();
+        const aligns=parsed[1].map(alignment),width=parsed[0].length;
+        const rowHtml=(row,tag)=>`<tr>${Array.from({length:width},(_,column)=>`<${tag} class="${aligns[column]||''}">${inline(row[column]||'')}</${tag}>`).join('')}</tr>`;
+        html.push(`<div class="table-wrap"><table><thead>${rowHtml(parsed[0],'th')}</thead><tbody>${parsed.slice(2).map(row=>rowHtml(row,'td')).join('')}</tbody></table></div>`);
+        index=cursor-1;
+        continue;
+      }
+    }
     const heading=line.match(/^#{1,6}\s+(.+)$/);
     const ordered=line.match(/^\d+\.\s+(.+)$/);
     const unordered=line.match(/^[-*]\s+(.+)$/);
     if(heading){closeList();html.push(`<h4>${inline(heading[1])}</h4>`);continue}
+    if(/^\s*---+\s*$/.test(line)){closeList();html.push('<hr>');continue}
     if(ordered||unordered){
       const type=ordered?'ol':'ul';
       if(list!==type){closeList();html.push(`<${type}>`);list=type}

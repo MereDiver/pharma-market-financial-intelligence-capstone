@@ -99,6 +99,16 @@ select:focus, textarea:focus { outline: none; border-color: var(--blue); box-sha
 .agent-response li { margin: 3px 0; }
 .agent-response li::marker { color: var(--blue); font-weight: 700; }
 .agent-response code { background: #e8f3f7; border-radius: 4px; padding: 1px 4px; font-size: 11px; }
+.agent-response hr { height: 1px; margin: 15px 0; border: 0; background: var(--line); }
+.table-wrap { max-width: 100%; margin: 9px 0 14px; overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+.agent-response table { width: 100%; min-width: 590px; border-collapse: collapse; font-size: 11px; }
+.agent-response th { padding: 9px 10px; background: linear-gradient(90deg, #e6f7fd, #f1fae8); color: var(--ink); font-weight: 700; text-align: left; white-space: nowrap; }
+.agent-response td { padding: 8px 10px; border-top: 1px solid #e5eef2; color: var(--ink-soft); vertical-align: top; }
+.agent-response tbody tr:nth-child(even) { background: #f8fbfc; }
+.agent-response tbody tr:hover { background: #f0f8fa; }
+.agent-response .align-center { text-align: center; }
+.agent-response .align-right { text-align: right; }
+.agent-response .align-left { text-align: left; }
 .user-message { justify-content: flex-end; }
 .user-message div { max-width: 78%; color: #fff; background: linear-gradient(135deg, var(--blue), #006f9f); border-radius: 13px 13px 3px 13px; padding: 10px 13px; box-shadow: 0 5px 14px rgba(0, 124, 191, .14); }
 
