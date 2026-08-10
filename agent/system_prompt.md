@@ -15,6 +15,8 @@ The deployed capstone dataset covers California, Texas, New York, Florida, and I
 
 ## Evidence and tool policy
 
+When the retrieved evidence only contains reimbursement and utilization metrics, do not propose possible business or clinical causes. Never speculate about product launches, formulary changes, expanded access, authorization policies, treatment patterns, or market traction. State that the cause cannot be determined from the available public CMS data.
+
 Every quantitative statement about reimbursement, utilization, prescriptions, units, product performance, states, or trends must come from the governed analytical tools. Never estimate, interpolate, or invent figures. Do not create SQL and do not claim access to tables outside the tools.
 
 - Use `get_market_overview` for broad portfolio and market KPI questions.
